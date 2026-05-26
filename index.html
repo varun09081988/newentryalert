@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Entry Alerts</title>
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Entry Alerts" />
+  <meta name="theme-color" content="#07080a" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    html, body { background: #07080a; color: #e8f5e9; font-family: 'IBM Plex Mono', monospace; }
+    input, button, textarea { font-family: 'IBM Plex Mono', monospace; }
+    input::placeholder, textarea::placeholder { color: #2a4a2a; }
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.35} }
+    @keyframes shimmer  { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+    @keyframes slidein  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+    #app { max-width: 500px; margin: 0 auto; min-height: 100vh; padding-bottom: 110px; }
+
+    /* ── Header ───────────────────────────────── */
+    .hdr {
+      padding: 50px 18px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      position: sticky; top: 0; background: #07080a; z-index: 20;
+    }
+    .hdr-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .hdr-label { font-size: 9px; letter-spacing: 4px; color: #2d5c35; text-transform: uppercase; }
+    .hdr h1 { font-size: 24px; font-weight: 700; color: #e8f5e9; margin-top: 3px; line-height: 1.1; }
+    .alert-pill {
+      background: #1a3d1f; border: 1px solid #4caf50;
+      border-radius: 20px; padding: 5px 14px;
+      display: flex; align-items: center; gap: 5px;
+      animation: pulse 1.5s infinite;
+    }
+    .alert-pill span { font-weight: 700; font-size: 13px; color: #81c784; }
+    .count-pill {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 20px; padding: 5px 12px; font-size: 11px; color: #2d5c35;
+    }
+
+    /* ── Status bar ───────────────────────────── */
+    .sbar { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .live-btn {
+      border-radius: 20px; padding: 4px 12px;
+      display: flex; align-items: center; gap: 5px;
+      cursor: pointer; border: none; font-size: 9px; letter-spacing: 1px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .ldot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .tok-btn {
+      margin-left: auto; background: none;
+      border: 1px solid rgba(255,255,255,0.07); border-radius: 20px;
+      padding: 4px 11px; color: #2d5c35; font-size: 9px;
+      cursor: pointer; letter-spacing: 1px; font-family: 'IBM Plex Mono', monospace;
+    }
+    .smsg { font-size: 9px; }
+
+    /* ── Stock list ───────────────────────────── */
+    #stock-list { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+    .empty-state { text-align: center; padding: 60px 0; color: #2a4a2a; }
+    .empty-state .ei { font-size: 30px; }
+    .empty-state p { font-size: 12px; margin-top: 10px; }
+    .empty-state small { font-size: 10px; color: #1e3020; }
+
+    /* ── Stock card ───────────────────────────── */
+    .scard {
+      border-radius: 16px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.02);
+      animation: slidein 0.25s ease;
+      transition: border-color 0.3s;
+    }
+    .scard.has-trigger { border-color: rgba(76,175,80,0.3); }
+
+    /* Card header */
+    .card-hdr {
+      padding: 12px 14px 10px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      position: relative; overflow: hidden;
+    }
+    .card-hdr.has-trigger {
+      background: linear-gradient(135deg, rgba(76,175,80,0.09), transparent);
+    }
+    .card-shimmer {
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #4caf50, transparent);
+      background-size: 200% 100%; animation: shimmer 2s infinite;
+    }
+    .card-sym { display: flex; align-items: center; gap: 7px; }
+    .sdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .sdot.green  { background:#4caf50; box-shadow:0 0 7px #4caf50; animation:pulse 1.2s infinite; }
+    .sdot.blue   { background:#29b6f6; }
+    .sdot.dim    { background:#1e3020; }
+    .sym-name { font-weight: 700; font-size: 14px; color: #e8f5e9; letter-spacing: 0.4px; }
+    .sym-full { font-size: 9px; color: #2d5c35; margin-top: 2px; letter-spacing: 0.3px; }
+    .card-ltp { text-align: right; }
+    .ltp-val { font-weight: 700; font-size: 18px; }
+    .ltp-val.green { color: #81c784; }
+    .ltp-val.white { color: #c8e6c9; }
+    .ltp-val.dim   { color: #3a5a3a; }
+    .del-btn {
+      background: none; border: none; color: #1e3020;
+      font-size: 16px; cursor: pointer; margin-top: 2px;
+      padding: 0; line-height: 1; display: block;
+    }
+    .del-btn:hover { color: #ef9a9a; }
+
+    /* Levels section */
+    .levels { padding: 0; }
+    .level-row {
+      display: flex; align-items: center;
+      padding: 9px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      gap: 8px; transition: background 0.2s;
+    }
+    .level-row:last-child { border-bottom: none; }
+    .level-row.trig  { background: rgba(76,175,80,0.06); }
+    .level-row.empty { opacity: 0.35; }
+
+    .lvl-label {
+      font-size: 9px; color: #2d5c35; letter-spacing: 1px;
+      width: 32px; flex-shrink: 0; text-transform: uppercase;
+    }
+
+    /* Price display / edit */
+    .lvl-price-wrap { flex: 1; }
+    .lvl-price-display {
+      font-size: 13px; color: #7aab7e; cursor: pointer;
+      border-bottom: 1px dashed #1e3020;
+      display: inline-block; padding-bottom: 1px;
+    }
+    .lvl-price-display:hover { color: #a5d6a7; border-color: #2d5c35; }
+    .lvl-price-empty {
+      font-size: 11px; color: #1e3020; cursor: pointer;
+      border-bottom: 1px dashed #1a2a1a;
+      display: inline-block; padding-bottom: 1px;
+    }
+    .lvl-edit { display: none; align-items: center; gap: 6px; }
+    .lvl-input {
+      width: 90px; padding: 3px 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(76,175,80,0.3);
+      border-radius: 6px; color: #c8e6c9;
+      font-size: 12px; outline: none;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .lvl-save {
+      background: #1a3d1f; border: 1px solid rgba(76,175,80,0.4);
+      border-radius: 6px; color: #81c784;
+      font-size: 10px; padding: 3px 9px; cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .lvl-cancel {
+      background: none; border: none; color: #2a4a2a;
+      font-size: 16px; cursor: pointer; line-height: 1;
+    }
+
+    /* Diff */
+    .lvl-diff { font-size: 10px; min-width: 72px; text-align: right; }
+    .lvl-diff.pos  { color: #ef9a9a; }
+    .lvl-diff.neg  { color: #81c784; }
+    .lvl-diff.away { color: #2a4a2a; }
+
+    /* Status badge */
+    .lvl-badge {
+      font-size: 9px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; letter-spacing: 1px;
+      min-width: 58px; text-align: center; flex-shrink: 0;
+    }
+    .lvl-badge.trigger {
+      background: #4caf50; color: #000;
+    }
+    .lvl-badge.wait {
+      background: rgba(255,255,255,0.05); color: #3a5a3a;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+    .lvl-badge.none {
+      background: rgba(255,255,255,0.02); color: #1e3020;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    /* ── FAB ──────────────────────────────────── */
+    .fab {
+      position: fixed; bottom: 28px; right: 20px;
+      width: 54px; height: 54px; border-radius: 50%;
+      background: #1a3d1f; border: 1px solid #4caf50;
+      font-size: 26px; color: #81c784; font-weight: 700;
+      cursor: pointer; box-shadow: 0 4px 20px rgba(76,175,80,0.25);
+      display: flex; align-items: center; justify-content: center; z-index: 50;
+    }
+
+    /* ── Bottom sheet ─────────────────────────── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+      display: flex; align-items: flex-end; z-index: 200;
+    }
+    .sheet {
+      background: #0b0e0c; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 20px 20px 0 0; padding: 22px 22px 44px;
+      width: 100%; max-height: 90vh; overflow-y: auto;
+    }
+    .sheet-handle { width: 34px; height: 3px; background: #1e3020; border-radius: 2px; margin: 0 auto 20px; }
+    .sheet-title { font-size: 14px; font-weight: 700; color: #c8e6c9; margin-bottom: 16px; }
+    .field-label { font-size: 9px; color: #2d5c35; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; margin-top: 14px; }
+    .sheet-input {
+      width: 100%; padding: 11px 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 9px; color: #c8e6c9;
+      font-size: 13px; outline: none; display: block;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .sheet-input:focus { border-color: rgba(76,175,80,0.35); }
+    .price-row { display: flex; gap: 8px; }
+    .price-row .price-field { flex: 1; }
+    .sheet-btn {
+      width: 100%; padding: 13px; margin-top: 20px;
+      background: #1a3d1f; border: 1px solid rgba(76,175,80,0.5);
+      border-radius: 10px; color: #81c784;
+      font-weight: 700; font-size: 13px; cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .sheet-err { color: #ef9a9a; font-size: 10px; margin-top: 8px; }
+    .price-hint { font-size: 9px; color: #1e3020; margin-top: 16px; line-height: 1.6; }
+
+    /* ── Token screen ─────────────────────────── */
+    #token-screen {
+      min-height: 100vh; background: #07080a;
+      padding: 52px 22px 40px; display: none; flex-direction: column;
+    }
+    .setup-step {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px; padding: 13px 15px;
+      display: flex; gap: 13px; align-items: flex-start; margin-bottom: 10px;
+    }
+    .si { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .st { font-size: 12px; font-weight: 700; color: #c8e6c9; }
+    .sd { font-size: 11px; color: #3a6040; line-height: 1.6; margin-top: 3px; }
+    textarea.sheet-input { resize: none; line-break: anywhere; font-size: 11px; color: #81c784; }
+    .back-row { display: flex; gap: 8px; margin-top: 12px; }
+    .sec-btn {
+      flex: 1; padding: 12px; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07); border-radius: 10px;
+      color: #3a5a3a; font-size: 12px; cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    /* range info bar */
+    .rinfo { padding: 8px 18px 0; }
+    .rinfo p { font-size: 9px; color: #1e3020; line-height: 1.8; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ TOKEN SETUP SCREEN ═══════════════════════════════════════════════ -->
+<div id="token-screen">
+  <p class="hdr-label">NSE · ENTRY ALERTS</p>
+  <h1 style="font-size:26px;font-weight:700;color:#e8f5e9;margin:6px 0 0;line-height:1.1">Connect<br>Zerodha</h1>
+
+  <div id="setup-intro">
+    <p style="color:#3a6040;font-size:12px;line-height:1.8;margin:18px 0 22px">
+      Uses your Kite session token for live NSE prices.<br>Paste once every morning — 30 seconds.
+    </p>
+    <div class="setup-step"><span class="si">🌐</span><div><p class="st">Open Kite in Chrome</p><p class="sd">Go to kite.zerodha.com and log in.</p></div></div>
+    <div class="setup-step"><span class="si">⋮</span><div><p class="st">Open Developer Tools</p><p class="sd">Chrome menu (⋮) → More tools → Developer tools → Application tab.</p></div></div>
+    <div class="setup-step"><span class="si">🍪</span><div><p class="st">Find the Cookie</p><p class="sd">Application → Cookies → https://kite.zerodha.com</p></div></div>
+    <div class="setup-step"><span class="si">🔑</span><div><p class="st">Copy enc_token</p><p class="sd">Find cookie named "enc_token" — copy its full Value string.</p></div></div>
+    <button class="sheet-btn" style="margin-top:6px" onclick="showTokenInput()">I have my enc_token →</button>
+  </div>
+
+  <div id="setup-input" style="display:none">
+    <p style="color:#3a6040;font-size:12px;margin:18px 0 14px">Paste your enc_token. Stored only on your device.</p>
+    <textarea id="token-input" class="sheet-input" rows="5" placeholder="Paste enc_token here..."></textarea>
+    <div class="back-row">
+      <button class="sec-btn" onclick="showTokenIntro()">← Back</button>
+      <button class="sheet-btn" style="margin-top:0;flex:2" onclick="saveToken()">Save &amp; Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MAIN APP ══════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none">
+  <div class="hdr">
+    <div class="hdr-top">
+      <div>
+        <p class="hdr-label">Zerodha · NSE Live</p>
+        <h1>Entry Alerts</h1>
+      </div>
+      <div id="hdr-badge"></div>
+    </div>
+    <div class="sbar">
+      <button class="live-btn" id="live-btn" onclick="toggleLive()"></button>
+      <span class="smsg" id="smsg"></span>
+      <button class="tok-btn" onclick="showTokenScreen()">🔑 UPDATE TOKEN</button>
+    </div>
+  </div>
+
+  <div class="rinfo">
+    <p>🟢 Trigger ≤ ₹0.50 &nbsp;·&nbsp; 🔵 Near ≤ ₹2.00 &nbsp;·&nbsp; Refreshes every 5s &nbsp;·&nbsp; Tap any price to edit</p>
+  </div>
+
+  <div id="stock-list"></div>
+  <button class="fab" onclick="openAddModal()">+</button>
+</div>
+
+<!-- ═══ ADD STOCK MODAL ═══════════════════════════════════════════════════ -->
+<div class="overlay" id="add-modal" style="display:none" onclick="closeAddModal()">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <p class="sheet-title">Add Stock to Watchlist</p>
+
+    <p class="field-label">NSE Symbol</p>
+    <input type="text" id="add-symbol" class="sheet-input" placeholder="e.g. MANALIPETC" oninput="this.value=this.value.toUpperCase()" />
+
+    <p class="field-label">Stock Name (optional)</p>
+    <input type="text" id="add-name" class="sheet-input" placeholder="e.g. Manali Petrochemicals" />
+
+    <p class="field-label">Liquid Entry Prices</p>
+    <div class="price-row">
+      <div class="price-field">
+        <input type="number" id="add-p1" class="sheet-input" placeholder="1st ₹" />
+      </div>
+      <div class="price-field">
+        <input type="number" id="add-p2" class="sheet-input" placeholder="2nd ₹" />
+      </div>
+      <div class="price-field">
+        <input type="number" id="add-p3" class="sheet-input" placeholder="3rd ₹" />
+      </div>
+    </div>
+    <p class="price-hint">At least 1st price required. 2nd and 3rd are optional — add them anytime later by tapping the price on the card.</p>
+
+    <p class="sheet-err" id="add-err"></p>
+    <button class="sheet-btn" onclick="addStock()">ADD TO WATCHLIST</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════
+let stocks  = [];   // [{symbol, name, p1, p2, p3}]
+let prices  = {};   // {symbol: ltp}
+let encToken = null;
+let isLive  = true;
+let intervalId = null;
+let lastUpdate = null;
+
+const ALERT  = 0.5;
+const NEAR   = 2.0;
+const TICK   = 5000;
+const LS_TOK = 'ea_tok';
+const LS_STK = 'ea_stk';
+
+// ══════════════════════════════════════════════════
+// Boot
+// ══════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  encToken = localStorage.getItem(LS_TOK);
+  try { stocks = JSON.parse(localStorage.getItem(LS_STK)) || []; } catch { stocks = []; }
+  if (!encToken) showTokenScreen(); else showApp();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+});
+
+// ══════════════════════════════════════════════════
+// Screen switching
+// ══════════════════════════════════════════════════
+function showTokenScreen() {
+  document.getElementById('token-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  showTokenIntro(); stopLive();
+}
+function showApp() {
+  document.getElementById('token-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderList(); renderLiveBtn(); startLive();
+}
+function showTokenIntro() {
+  document.getElementById('setup-intro').style.display = 'block';
+  document.getElementById('setup-input').style.display = 'none';
+}
+function showTokenInput() {
+  document.getElementById('setup-intro').style.display = 'none';
+  document.getElementById('setup-input').style.display = 'block';
+  setTimeout(() => document.getElementById('token-input').focus(), 80);
+}
+function saveToken() {
+  const t = document.getElementById('token-input').value.trim();
+  if (!t) return;
+  encToken = t; localStorage.setItem(LS_TOK, t);
+  showApp();
+}
+
+// ══════════════════════════════════════════════════
+// Fetch
+// ══════════════════════════════════════════════════
+async function fetchPrices() {
+  if (!encToken || stocks.length === 0) return;
+  setStatus('fetching');
+  const qs = stocks.map(s => `i=NSE%3A${s.symbol}`).join('&');
+  try {
+    const res = await fetch(`https://api.kite.trade/quote?${qs}`, {
+      headers: { 'Authorization': `enctoken ${encToken}`, 'X-Kite-Version': '3' }
+    });
+    if (res.status === 401 || res.status === 403) {
+      setStatus('error','Token expired — tap 🔑 to update'); stopLive(); return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.status !== 'success') throw new Error(json.message || 'Kite error');
+    Object.entries(json.data).forEach(([k,v]) => {
+      prices[k.replace('NSE:','')] = v.last_price;
+    });
+    lastUpdate = new Date(); setStatus('ok'); renderList(); renderBadge();
+  } catch(e) { setStatus('error', e.message); }
+}
+
+// ══════════════════════════════════════════════════
+// Live toggle
+// ══════════════════════════════════════════════════
+function startLive() { isLive=true; fetchPrices(); intervalId=setInterval(fetchPrices,TICK); renderLiveBtn(); }
+function stopLive()  { isLive=false; clearInterval(intervalId); renderLiveBtn(); }
+function toggleLive(){ isLive ? stopLive() : startLive(); }
+
+// ══════════════════════════════════════════════════
+// Status / badge
+// ══════════════════════════════════════════════════
+function setStatus(t, msg) {
+  const el = document.getElementById('smsg');
+  if (t==='ok') { el.style.color='#2d5c35'; el.textContent=`✓ ${lastUpdate.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`; }
+  else if (t==='fetching') { el.style.color='#2d5c35'; el.textContent='fetching...'; }
+  else { el.style.color='#ef9a9a'; el.textContent=`⚠ ${msg}`; }
+}
+function renderLiveBtn() {
+  const b = document.getElementById('live-btn');
+  b.style.background = isLive ? 'rgba(76,175,80,0.08)' : 'rgba(255,255,255,0.03)';
+  b.style.border = isLive ? '1px solid rgba(76,175,80,0.2)' : '1px solid rgba(255,255,255,0.06)';
+  b.innerHTML = `<span class="ldot" style="background:${isLive?'#4caf50':'#1e3020'};animation:${isLive?'pulse 2s infinite':'none'}"></span><span style="color:${isLive?'#4caf50':'#2d5c35'}">${isLive?'LIVE':'PAUSED'}</span>`;
+}
+function renderBadge() {
+  const trig = stocks.filter(s => triggerCount(s) > 0).length;
+  const el = document.getElementById('hdr-badge');
+  if (trig > 0) {
+    el.innerHTML = `<div class="alert-pill"><span>🔔</span><span>${trig} TRIGGER${trig>1?'S':''}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="count-pill">${stocks.length} stock${stocks.length!==1?'s':''}</div>`;
+  }
+}
+function triggerCount(s) {
+  const ltp = prices[s.symbol];
+  if (ltp === undefined) return 0;
+  return [s.p1, s.p2, s.p3].filter(p => p !== null && p !== undefined && Math.abs(ltp - p) <= ALERT).length;
+}
+
+// ══════════════════════════════════════════════════
+// Render
+// ══════════════════════════════════════════════════
+function renderList() {
+  renderBadge();
+  const el = document.getElementById('stock-list');
+  if (!stocks.length) {
+    el.innerHTML = `<div class="empty-state"><p class="ei">📋</p><p>Watchlist is empty</p><small>Tap + to add your first stock</small></div>`;
+    return;
+  }
+  // Sort: stocks with any trigger first, then by closest distance
+  const sorted = [...stocks].sort((a, b) => {
+    const ta = triggerCount(a), tb = triggerCount(b);
+    if (ta !== tb) return tb - ta;
+    return closestDist(a) - closestDist(b);
+  });
+  el.innerHTML = sorted.map(s => cardHTML(s)).join('');
+}
+
+function closestDist(s) {
+  const ltp = prices[s.symbol];
+  if (ltp === undefined) return 9999;
+  const dists = [s.p1, s.p2, s.p3]
+    .filter(p => p !== null && p !== undefined)
+    .map(p => Math.abs(ltp - p));
+  return dists.length ? Math.min(...dists) : 9999;
+}
+
+function cardHTML(s) {
+  const ltp = prices[s.symbol];
+  const hasLTP = ltp !== undefined;
+  const anyTrig = triggerCount(s) > 0;
+  const dotCls = !hasLTP ? 'dim' : anyTrig ? 'green' : closestDist(s) <= NEAR ? 'blue' : 'dim';
+  const ltpCls = !hasLTP ? 'dim' : anyTrig ? 'green' : 'white';
+
+  return `
+  <div class="scard${anyTrig?' has-trigger':''}" id="card-${s.symbol}">
+    <div class="card-hdr${anyTrig?' has-trigger':''}">
+      ${anyTrig ? '<div class="card-shimmer"></div>' : ''}
+      <div class="card-sym">
+        <span class="sdot ${dotCls}"></span>
+        <div>
+          <div class="sym-name">${s.symbol}</div>
+          ${s.name ? `<div class="sym-full">${s.name}</div>` : ''}
+        </div>
+      </div>
+      <div class="card-ltp">
+        <div class="ltp-val ${ltpCls}">${hasLTP ? '₹'+ltp.toFixed(2) : '—'}</div>
+        <button class="del-btn" onclick="deleteStock('${s.symbol}')">×</button>
+      </div>
+    </div>
+    <div class="levels">
+      ${levelRow(s, 1, ltp)}
+      ${levelRow(s, 2, ltp)}
+      ${levelRow(s, 3, ltp)}
+    </div>
+  </div>`;
+}
+
+function levelRow(s, n, ltp) {
+  const p = s['p'+n];
+  const hasP = p !== null && p !== undefined;
+  const hasltp = ltp !== undefined;
+  const d = hasP && hasltp ? ltp - p : null;
+  const ad = d !== null ? Math.abs(d) : null;
+  const isTrig = ad !== null && ad <= ALERT;
+  const isNear = ad !== null && ad <= NEAR && !isTrig;
+  const rowCls = isTrig ? 'trig' : !hasP ? 'empty' : '';
+
+  let diffHTML = '';
+  if (d !== null) {
+    const cls = d > 0 ? 'pos' : d < 0 ? 'neg' : 'away';
+    diffHTML = `<div class="lvl-diff ${cls}">${d>0?'+':''}${d.toFixed(2)}<br><span style="color:#1e3020;font-size:8px">${ad.toFixed(2)} away</span></div>`;
+  } else {
+    diffHTML = `<div class="lvl-diff away">—</div>`;
+  }
+
+  let badgeHTML = '';
+  if (!hasP) {
+    badgeHTML = `<div class="lvl-badge none">—</div>`;
+  } else if (isTrig) {
+    badgeHTML = `<div class="lvl-badge trigger">TRIGGER</div>`;
+  } else {
+    badgeHTML = `<div class="lvl-badge wait">WAIT</div>`;
+  }
+
+  const priceDisplay = hasP
+    ? `<span class="lvl-price-display" onclick="startLvlEdit('${s.symbol}',${n})">₹${Number(p).toFixed(2)} ✎</span>`
+    : `<span class="lvl-price-empty" onclick="startLvlEdit('${s.symbol}',${n})">+ Set price</span>`;
+
+  return `
+  <div class="level-row ${rowCls}" id="lvl-${s.symbol}-${n}">
+    <span class="lvl-label">L${n}</span>
+    <div class="lvl-price-wrap">
+      <div id="disp-${s.symbol}-${n}">${priceDisplay}</div>
+      <div class="lvl-edit" id="edit-${s.symbol}-${n}">
+        <input class="lvl-input" type="number" id="einp-${s.symbol}-${n}" value="${hasP ? p : ''}" placeholder="₹ price" />
+        <button class="lvl-save" onclick="saveLvlEdit('${s.symbol}',${n})">✓</button>
+        <button class="lvl-cancel" onclick="cancelLvlEdit('${s.symbol}',${n})">×</button>
+      </div>
+    </div>
+    ${diffHTML}
+    ${badgeHTML}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════
+// Level edit
+// ══════════════════════════════════════════════════
+function startLvlEdit(sym, n) {
+  document.getElementById(`disp-${sym}-${n}`).style.display = 'none';
+  const editEl = document.getElementById(`edit-${sym}-${n}`);
+  editEl.style.display = 'flex';
+  setTimeout(() => document.getElementById(`einp-${sym}-${n}`).focus(), 60);
+}
+function cancelLvlEdit(sym, n) {
+  document.getElementById(`disp-${sym}-${n}`).style.display = 'block';
+  document.getElementById(`edit-${sym}-${n}`).style.display = 'none';
+}
+function saveLvlEdit(sym, n) {
+  const v = parseFloat(document.getElementById(`einp-${sym}-${n}`).value);
+  stocks = stocks.map(s => {
+    if (s.symbol !== sym) return s;
+    return { ...s, ['p'+n]: isNaN(v) ? null : parseFloat(v.toFixed(2)) };
+  });
+  localStorage.setItem(LS_STK, JSON.stringify(stocks));
+  renderList();
+}
+
+// ══════════════════════════════════════════════════
+// Add / Delete
+// ══════════════════════════════════════════════════
+function openAddModal() {
+  document.getElementById('add-modal').style.display = 'flex';
+  ['symbol','name','p1','p2','p3'].forEach(id => document.getElementById('add-'+id).value = '');
+  document.getElementById('add-err').textContent = '';
+  setTimeout(() => document.getElementById('add-symbol').focus(), 80);
+}
+function closeAddModal() { document.getElementById('add-modal').style.display = 'none'; }
+
+function addStock() {
+  const sym  = document.getElementById('add-symbol').value.trim().toUpperCase();
+  const name = document.getElementById('add-name').value.trim();
+  const p1   = parseFloat(document.getElementById('add-p1').value);
+  const p2   = parseFloat(document.getElementById('add-p2').value);
+  const p3   = parseFloat(document.getElementById('add-p3').value);
+  if (!sym) { document.getElementById('add-err').textContent = 'Enter NSE symbol'; return; }
+  if (isNaN(p1)) { document.getElementById('add-err').textContent = 'At least 1st liquid price is required'; return; }
+  if (stocks.find(s => s.symbol === sym)) { document.getElementById('add-err').textContent = 'Already in watchlist'; return; }
+  stocks.push({
+    symbol: sym, name: name||'',
+    p1: parseFloat(p1.toFixed(2)),
+    p2: isNaN(p2) ? null : parseFloat(p2.toFixed(2)),
+    p3: isNaN(p3) ? null : parseFloat(p3.toFixed(2)),
+  });
+  localStorage.setItem(LS_STK, JSON.stringify(stocks));
+  closeAddModal(); renderList(); fetchPrices();
+}
+
+function deleteStock(sym) {
+  stocks = stocks.filter(s => s.symbol !== sym);
+  delete prices[sym];
+  localStorage.setItem(LS_STK, JSON.stringify(stocks));
+  renderList();
+}
+
+// keyboard
+document.addEventListener('keydown', e => {
+  if (e.key==='Enter') {
+    if (document.getElementById('add-modal').style.display!=='none') addStock();
+    if (document.getElementById('setup-input').style.display!=='none') saveToken();
+  }
+});
+</script>
+</body>
+</html>
