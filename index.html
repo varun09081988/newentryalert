@@ -408,8 +408,9 @@ async function fetchPrices() {
   if (!encToken || stocks.length === 0) return;
   setStatus('fetching');
   const qs = stocks.map(s => `i=NSE%3A${s.symbol}`).join('&');
+  const PROXY = 'https://kite-proxy.k-varun88.workers.dev';
   try {
-    const res = await fetch(`https://api.kite.trade/quote?${qs}`, {
+    const res = await fetch(`${PROXY}/quote?${qs}`, {
       headers: { 'Authorization': `enctoken ${encToken}`, 'X-Kite-Version': '3' }
     });
     if (res.status === 401 || res.status === 403) {
